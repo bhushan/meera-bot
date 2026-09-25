@@ -23,6 +23,30 @@ export type HandleReviewOutcome =
  * re-delivered update confirms the existing state instead of changing it.
  * Rejected drafts are kept; nothing is ever deleted or published.
  */
+/**
+ * Acknowledging a callback query only dismisses the spinner on the button.
+ * Telegram rejects one that is older than roughly 15 minutes ("query is too
+ * old"), and a cold start or a retry can easily push us past that. By the time
+ * we call this the decision is already committed, so a failure here must never
+ * fail the review: doing so would dead-letter a successful approval and tell
+ * the reviewer it did not work.
+ */
+async function acknowledge(deps: PipelineDeps, review: ReviewInput, text: string): Promise<void> {
+  if (review.kind !== 'review_callback') return;
+  try {
+    await deps.telegram.answerCallbackQuery({
+      callbackQueryId: review.callbackQueryId,
+      text,
+    });
+  } catch (err) {
+    deps.logger.warn('review_callback_ack_failed', {
+      shortId: review.draftShortId,
+      updateId: review.updateId,
+      err,
+    });
+  }
+}
+
 export async function handleReview(
   deps: PipelineDeps,
   review: ReviewInput,
@@ -43,12 +67,7 @@ export async function handleReview(
 
     if (!outcome.found) {
       logger.warn('review_draft_not_found', { shortId, updateId: review.updateId });
-      if (review.kind === 'review_callback') {
-        await telegram.answerCallbackQuery({
-          callbackQueryId: review.callbackQueryId,
-          text: 'Draft not found',
-        });
-      }
+      await acknowledge(deps, review, 'Draft not found');
       await telegram.sendMessage({
         chatId: review.chatId,
         text: buildUnknownDraftMessage(shortId),
@@ -69,16 +88,11 @@ export async function handleReview(
       updateId: review.updateId,
     });
 
-    if (review.kind === 'review_callback') {
-      await telegram.answerCallbackQuery({
-        callbackQueryId: review.callbackQueryId,
-        text: changed
-          ? draft.status === 'approved'
-            ? 'Approved'
-            : 'Rejected'
-          : `Already ${draft.status}`,
-      });
-    }
+    await acknowledge(
+      deps,
+      review,
+      changed ? (draft.status === 'approved' ? 'Approved' : 'Rejected') : `Already ${draft.status}`,
+    );
 
     // Retire the buttons on the original draft message so the state is unambiguous.
     const draftMessageId =
