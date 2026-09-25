@@ -20,13 +20,18 @@ Telegram note  ->  score 0-10  ->  (optional news angle)  ->  draft in her voice
 
 ## Live deployment
 
+The live URLs, bot handle and Supabase project ref are deliberately not published
+here. This repository is public; the running instance is single-operator and
+private. Operators find them in the Vercel and Supabase dashboards, or in
+`.env.local` (`APP_BASE_URL`, `SUPABASE_URL`).
+
 | | |
 | --- | --- |
-| App | https://<your-app>.vercel.app |
-| Health | https://<your-app>.vercel.app/api/health |
-| Bot | [@<your-bot>_bot](https://t.me/<your-bot>_bot) |
+| App | `https://<your-app>.vercel.app` |
+| Health | `https://<your-app>.vercel.app/api/health` |
+| Bot | `@<your-bot>_bot` on Telegram |
 | Model | `gemini-3.8-flash` |
-| Database | Supabase `<project-ref>`, `us-east-1` |
+| Database | Supabase project `<project-ref>`, region `us-east-1` |
 
 The Supabase region is matched to the Vercel function region (`iad1`) on purpose: the pipeline makes several database round trips per note, so a cross-continent pairing would add seconds of latency to every draft.
 
