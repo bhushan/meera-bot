@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createHarness, TEST_CHAT_ID } from '../helpers/harness';
 import { STRONG_NOTE } from '../fixtures/notes';
+import { AppError } from '@/lib/errors';
 
 const SCORE = { score: 9, reason: 'Specific and evidenced.', keywords: ['ph'] };
 const DRAFT = {
@@ -210,5 +211,43 @@ describe('unknown and malformed review targets', () => {
     });
     expect(response.body).toMatchObject({ ignored: true });
     expect(harness.repo.reviews).toHaveLength(0);
+  });
+});
+
+describe('a failing callback acknowledgement must not undo a recorded decision', () => {
+  it('keeps the approval, confirms it, and marks the update done', async () => {
+    const { harness, draft } = await harnessWithPendingDraft();
+    // Telegram rejects an expired callback query with "query is too old".
+    // The decision is already committed at this point, so this must not fail.
+    harness.telegram.answerCallbackQuery = async () => {
+      throw new AppError({
+        kind: 'telegram',
+        message: 'Telegram answerCallbackQuery failed with HTTP 400: Bad Request: query is too old',
+      });
+    };
+
+    const update = callback(draft.short_id, 'a', draft.telegram_message_id!);
+    await harness.post(update);
+
+    expect(harness.repo.drafts.get(draft.id)!.status).toBe('approved');
+    expect(harness.repo.updates.get(update.update_id)!.status).toBe('done');
+    expect(harness.repo.reviews.filter((r) => r.applied)).toHaveLength(1);
+
+    const sent = harness.telegram.sent.map((m) => m.text).join('\n');
+    expect(sent).toMatch(/approved/i);
+    expect(sent).not.toMatch(/something went wrong/i);
+  });
+
+  it('still reports an unknown draft id when the acknowledgement fails', async () => {
+    const { harness } = await harnessWithPendingDraft();
+    harness.telegram.answerCallbackQuery = async () => {
+      throw new AppError({ kind: 'telegram', message: 'query is too old' });
+    };
+
+    const update = callback('ZZZZZZ', 'a', 5);
+    await harness.post(update);
+
+    expect(harness.lastMessage()!.text).toMatch(/no draft found/i);
+    expect(harness.repo.updates.get(update.update_id)!.status).toBe('done');
   });
 });
