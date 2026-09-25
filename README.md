@@ -259,6 +259,7 @@ delete from news_cache where expires_at < now();
 | Drafts never carry a news source | Expected when RSS finds nothing recent or the relevance check declines. Logs show `news_search` with `outcome` and `news_relevance` with `selected` |
 | Duplicate drafts for one note | Should be impossible: `telegram_updates.update_id` is unique and `notes` is unique on `(chat_id, message_id)`. If it happens, the migration did not fully apply |
 | Webhook returns 429 | The container hit its concurrency limit. Telegram retries automatically, before the update is claimed, so nothing is lost |
+| Logs show `Gemini stopped at the output token limit` | `maxOutputTokens` budgets the model's reasoning tokens and its visible output together, and reasoning consumed the budget before the JSON was finished. The context line reports `thoughtsTokenCount` against `maxOutputTokens`; raise the budget for that call in `src/lib/gemini` |
 
 ## Rollback
 

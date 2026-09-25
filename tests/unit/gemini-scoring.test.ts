@@ -23,6 +23,20 @@ describe('SCORE_THRESHOLD', () => {
   });
 });
 
+describe('token budget', () => {
+  it('leaves room for the reasoning tokens the budget also has to cover', async () => {
+    // `maxOutputTokens` bounds thinking and visible output together. Sized for
+    // the JSON alone it gets consumed by thinking and the object is truncated,
+    // which is what took scoring down in production on 2026-09-25.
+    const capture: { last?: unknown } = {};
+    await scoreNote(fakeGemini({ score: 8, reason: 'ok', keywords: ['ph'] }, capture), {
+      noteText: STRONG_NOTE,
+    });
+    const request = capture.last as { maxOutputTokens: number };
+    expect(request.maxOutputTokens).toBeGreaterThanOrEqual(2048);
+  });
+});
+
 describe('noteScoreSchema', () => {
   it('accepts a well-formed score payload', () => {
     expect(

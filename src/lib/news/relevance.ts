@@ -66,7 +66,9 @@ export async function selectRelevantNews(
       schema: newsRelevanceSchema,
       responseSchema: RESPONSE_SCHEMA as unknown as Record<string, unknown>,
       temperature: 0,
-      maxOutputTokens: 256,
+      // Budgets reasoning tokens as well as the visible output, so this is far
+      // larger than the response needs on its own.
+      maxOutputTokens: 1024,
     });
 
     const reason = result.reason ?? '';
