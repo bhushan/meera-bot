@@ -8,18 +8,48 @@ const MAX_FEED_BYTES = 2_000_000;
 const DEFAULT_MAX_AGE_DAYS = 30;
 const DEFAULT_MAX_RESULTS = 6;
 const MAX_QUERY_LENGTH = 200;
+/** Beyond a handful of OR'd terms the feed drifts off-topic. */
+const MAX_QUERY_TERMS = 4;
+/**
+ * Google News matches a quoted phrase literally, and recall collapses with
+ * length: measured against the live feed, a four-word phrase returned 1 result,
+ * three words returned 9, and two words returned 100. Long phrases from the
+ * scorer are trimmed so a term can still match something.
+ */
+const MAX_WORDS_PER_TERM = 3;
 
-/** Build a Google News search query from validated keywords. Multi-word terms are quoted. */
+/**
+ * Build a Google News search query from validated keywords.
+ *
+ * Terms are joined with OR, not with spaces. Google News ANDs space-separated
+ * terms, and the scorer produces specific multi-word phrases, so an AND query
+ * demands that one article contain every one of them and reliably returns
+ * nothing. Recall belongs here; precision belongs to the Gemini relevance
+ * check, which sees the candidates and is free to reject all of them.
+ */
 export function newsQueryFromKeywords(keywords: string[]): string {
   const terms: string[] = [];
   for (const raw of keywords) {
-    const keyword = raw.trim().replace(/["\\]/g, '').replace(/\s+/g, ' ');
+    if (terms.length >= MAX_QUERY_TERMS) break;
+    const keyword = raw
+      .trim()
+      .replace(/["\\]/g, '')
+      .replace(/\s+/g, ' ')
+      .split(' ')
+      .slice(0, MAX_WORDS_PER_TERM)
+      .join(' ');
     if (keyword.length === 0 || keyword.length > 60) continue;
     terms.push(keyword.includes(' ') ? `"${keyword}"` : keyword);
   }
-  let query = terms.join(' ');
-  if (query.length > MAX_QUERY_LENGTH) query = query.slice(0, MAX_QUERY_LENGTH).trimEnd();
-  return query;
+
+  // Drop whole terms rather than slicing mid-string, which would leave a
+  // dangling operator or an unbalanced quote in the query.
+  while (terms.length > 1 && terms.join(' OR ').length > MAX_QUERY_LENGTH) {
+    terms.pop();
+  }
+
+  const query = terms.join(' OR ');
+  return query.length > MAX_QUERY_LENGTH ? query.slice(0, MAX_QUERY_LENGTH).trimEnd() : query;
 }
 
 export function buildGoogleNewsUrl(query: string): string {

@@ -46,10 +46,35 @@ const STALE = item({
 });
 
 describe('newsQueryFromKeywords / buildGoogleNewsUrl', () => {
-  it('joins keywords into a quoted OR-free query', () => {
+  it('joins keywords with OR so the feed returns candidates to judge', () => {
+    // Google News ANDs space-separated terms. Requiring every specific phrase to
+    // appear in one article returns nothing, so recall comes from OR here and
+    // precision comes from the Gemini relevance check downstream.
     expect(newsQueryFromKeywords(['preservative', 'pH stability'])).toBe(
-      'preservative "pH stability"',
+      'preservative OR "pH stability"',
     );
+  });
+
+  it('never builds a query that requires every term at once', () => {
+    const query = newsQueryFromKeywords(['a b', 'c d', 'e f']);
+    expect(query.split(' OR ')).toHaveLength(3);
+  });
+
+  it('keeps the query focused by using at most four terms', () => {
+    const query = newsQueryFromKeywords(['one', 'two', 'three', 'four', 'five']);
+    expect(query.split(' OR ')).toHaveLength(4);
+    expect(query).not.toContain('five');
+  });
+
+  it('never leaves a dangling OR when a term is dropped for length', () => {
+    const query = newsQueryFromKeywords([
+      'x'.repeat(50),
+      'y'.repeat(50),
+      'z'.repeat(50),
+      'w'.repeat(50),
+    ]);
+    expect(query.endsWith(' OR')).toBe(false);
+    expect(query.startsWith('OR ')).toBe(false);
   });
 
   it('drops empty keywords and caps the query length', () => {
@@ -242,5 +267,19 @@ describe('searchGoogleNews', () => {
       now: NOW,
     });
     expect(result.outcome).toBe('error');
+  });
+});
+
+describe('newsQueryFromKeywords: phrase length', () => {
+  it('truncates an over-long phrase to something the feed can actually match', () => {
+    // Measured live: "contract manufacturing quality control" returns 1 result,
+    // "contract manufacturing" returns 100.
+    expect(newsQueryFromKeywords(['contract manufacturing quality control'])).toBe(
+      '"contract manufacturing quality"',
+    );
+  });
+
+  it('leaves short terms untouched', () => {
+    expect(newsQueryFromKeywords(['skin barrier', 'ph'])).toBe('"skin barrier" OR ph');
   });
 });
