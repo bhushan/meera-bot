@@ -2,7 +2,7 @@
 
 A private Telegram assistant that turns Meera Pillai's raw skincare notes into LinkedIn drafts in her own voice, and stops at a human review gate.
 
-**It never publishes to LinkedIn and never schedules anything.** Approval marks a row in Postgres. Meera does the posting.
+**It never publishes to LinkedIn and never schedules anything.** Approval marks a row in Postgres and hands the post back as a copy-ready block. Meera does the posting.
 
 ```
 Telegram note  ->  score 0-10  ->  (optional news angle)  ->  draft in her voice
@@ -12,7 +12,10 @@ Telegram note  ->  score 0-10  ->  (optional news angle)  ->  draft in her voice
                                                                         |
                                                             Supabase records the decision
                                                                         |
-                                                            Meera copies it into LinkedIn
+                                                            approved: the post comes back
+                                                            on its own, ready to copy
+                                                                        |
+                                                            Meera pastes it into LinkedIn
 ```
 
 ## Live deployment
@@ -212,6 +215,8 @@ If the model claims a URL we did not supply, `used_news` is forced to false and 
 **Drafting.** The active voice skill is sent as the system instruction on every drafting call. The model is told not to invent her experiences, numbers, customer messages, studies or product facts, and to make uncertainty visible rather than fill gaps. Output is schema-validated, then emoji are stripped and hashtags removed unless the original note used them.
 
 **Review.** The draft message carries a six-character id, the score and its reason, the body, the source block when applicable, and Approve / Reject buttons. `APPROVE <id>` and `REJECT <id>` work as text too. The status change and the audit row happen inside one Postgres function that only moves a draft out of `pending`, so a second button press, a redelivered update, or a reject-after-approve all confirm the existing state instead of changing it. Rejected drafts are kept.
+
+**Handover.** An approval is answered with two messages: the confirmation, then the post body alone in a code block, which Telegram gives a one-tap copy control. Nothing has to be trimmed before pasting. A post too long to fit one message is sent as unparsed plain text instead, because a code block split across chunks would leave an unclosed tag and earn a 400 on a decision already committed. A repeat approval re-sends the block, which is the only way to recover the text after the draft message has scrolled away.
 
 ## Operations
 

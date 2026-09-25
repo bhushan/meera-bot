@@ -51,9 +51,13 @@ Point at the screen and say:
 
 ## 0:40 to 0:50, show the gate, then the rejection path
 
-Tap **Approve**. The buttons disappear and the bot confirms:
+Tap **Approve**. The buttons disappear, the bot confirms, and the post comes back on its own:
 
-> "Draft 7K2QF9 is approved and saved. Copy it into LinkedIn when you are ready; this bot does not post anything."
+> "Draft 7K2QF9 is approved and saved. The post is in the next message, ready to copy into LinkedIn. This bot does not post anything."
+
+The next message is the post body alone, in a code block with a one-tap copy control. Tap copy and say:
+
+> "That is the handover. No id, no score, no source block, nothing to trim. She pastes it into LinkedIn herself, which is the whole point: the approval moved a row in Postgres, it did not publish anything."
 
 Immediately send the weak note:
 
