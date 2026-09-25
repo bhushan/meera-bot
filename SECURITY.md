@@ -59,6 +59,15 @@ There is no admin dashboard and no public read path to any draft. The only route
 - Only the headline, publication, date and RSS description are sent to the model. No article body is fetched, and no protected page is scraped.
 - Draft text is HTML-escaped before it reaches Telegram, so a model-generated `<a href>` cannot become a live link in the review message.
 
+## Database hardening
+
+Verified against the live project with Supabase's own database linter (`get_advisors`, security):
+
+- **`function_search_path_mutable` (WARN): fixed.** All seven Postgres functions now pin `set search_path = ''`. Without it they inherit the caller's `search_path`, so a role able to create objects in an earlier schema could shadow a table or operator they depend on. Every reference inside them is already schema-qualified or lives in `pg_catalog`, so an empty path is safe.
+- **`rls_enabled_no_policy` (INFO): intentional, not a defect.** All seven tables have RLS enabled with zero policies. That is the deny-all posture this system wants: `anon` and `authenticated` can read nothing at all, and the server reaches the data only with the service role key, which bypasses RLS. Adding policies would only be needed if a browser client were ever to talk to these tables directly, which it must not.
+
+The transactional guarantees were exercised against the real database rather than only against mocks. A duplicate `claim_telegram_update` inserted nothing; `create_draft_for_note` flipped the note to `drafted` in the same transaction as the draft insert; and for a single draft, three review calls (approve, approve again, then reject) produced three audit rows but exactly one applied change, with the draft staying `approved`.
+
 ## Data retention
 
 | Data | Retention | Rationale |
