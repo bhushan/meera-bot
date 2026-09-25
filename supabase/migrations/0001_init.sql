@@ -275,6 +275,9 @@ create index if not exists rate_limit_events_chat_time_idx
 create or replace function public.touch_updated_at()
 returns trigger
 language plpgsql
+-- Empty search_path: every reference below is schema-qualified or in pg_catalog,
+-- so nothing here can be shadowed by objects in a caller-controlled schema.
+set search_path = ''
 as $$
 begin
   new.updated_at := now();
@@ -310,6 +313,9 @@ create or replace function public.claim_telegram_update(
 )
 returns boolean
 language plpgsql
+-- Empty search_path: every reference below is schema-qualified or in pg_catalog,
+-- so nothing here can be shadowed by objects in a caller-controlled schema.
+set search_path = ''
 as $$
 declare
   v_inserted boolean := false;
@@ -333,6 +339,9 @@ create or replace function public.store_note(
 )
 returns jsonb
 language plpgsql
+-- Empty search_path: every reference below is schema-qualified or in pg_catalog,
+-- so nothing here can be shadowed by objects in a caller-controlled schema.
+set search_path = ''
 as $$
 declare
   v_note public.notes%rowtype;
@@ -365,6 +374,9 @@ create or replace function public.create_draft_for_note(
 )
 returns jsonb
 language plpgsql
+-- Empty search_path: every reference below is schema-qualified or in pg_catalog,
+-- so nothing here can be shadowed by objects in a caller-controlled schema.
+set search_path = ''
 as $$
 declare
   v_draft public.drafts%rowtype;
@@ -402,6 +414,9 @@ create or replace function public.record_draft_review(
 )
 returns jsonb
 language plpgsql
+-- Empty search_path: every reference below is schema-qualified or in pg_catalog,
+-- so nothing here can be shadowed by objects in a caller-controlled schema.
+set search_path = ''
 as $$
 declare
   v_draft    public.drafts%rowtype;
@@ -459,6 +474,9 @@ create or replace function public.check_rate_limit(
 )
 returns jsonb
 language plpgsql
+-- Empty search_path: every reference below is schema-qualified or in pg_catalog,
+-- so nothing here can be shadowed by objects in a caller-controlled schema.
+set search_path = ''
 as $$
 declare
   v_used integer;
@@ -491,6 +509,9 @@ create or replace function public.activate_voice_skill(
 )
 returns jsonb
 language plpgsql
+-- Empty search_path: every reference below is schema-qualified or in pg_catalog,
+-- so nothing here can be shadowed by objects in a caller-controlled schema.
+set search_path = ''
 as $$
 declare
   v_skill public.voice_skills%rowtype;
