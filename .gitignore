@@ -27,7 +27,6 @@ next-env.d.ts
 *.pfx
 secrets.json
 service-account*.json
-!.env.example
 
 # Vercel / Supabase local state
 .vercel
@@ -54,3 +53,7 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 *.swp
+
+# Vercel CLI appends `.env*`; keep the example file tracked after it.
+.env*
+!.env.example
