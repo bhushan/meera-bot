@@ -1,7 +1,7 @@
 import type { NewsItem } from '../news/types';
 import type { DraftStatus } from '../db/types';
 import { buildCallbackData } from './parse';
-import { escapeHtml } from './format';
+import { escapeHtml, TELEGRAM_MAX_MESSAGE_LENGTH } from './format';
 import type { InlineButton } from './client';
 
 /** YYYY-MM-DD, or `unknown` when the feed gave us no parseable date. */
@@ -97,13 +97,40 @@ export function buildReviewConfirmation(input: {
   status: DraftStatus;
   changed: boolean;
 }): string {
-  const verb = input.status === 'approved' ? 'approved' : 'rejected';
-  if (!input.changed) {
-    return `Draft ${escapeHtml(input.shortId)} was already ${verb}. Nothing changed.`;
+  const shortId = escapeHtml(input.shortId);
+
+  if (input.status === 'rejected') {
+    return input.changed
+      ? `Draft ${shortId} is rejected and kept on file.`
+      : `Draft ${shortId} was already rejected. Nothing changed.`;
   }
-  return input.status === 'approved'
-    ? `Draft ${escapeHtml(input.shortId)} is approved and saved. Copy it into LinkedIn when you are ready; this bot does not post anything.`
-    : `Draft ${escapeHtml(input.shortId)} is rejected and kept on file.`;
+
+  const lead = input.changed
+    ? `Draft ${shortId} is approved and saved.`
+    : `Draft ${shortId} was already approved. Nothing changed.`;
+  // An approval is always followed by `buildCopyableDraft`, so say where the post is.
+  return `${lead} The post is in the next message, ready to copy into LinkedIn. This bot does not post anything.`;
+}
+
+export interface CopyableDraft {
+  text: string;
+  /** `null` sends the text verbatim, with no entity parsing at all. */
+  parseMode: 'HTML' | null;
+}
+
+/**
+ * The approved post on its own, with nothing to trim before pasting.
+ *
+ * A `<pre>` block gives Telegram clients a one-tap copy control. The client
+ * splits anything over the message limit into chunks, which would leave the
+ * opening tag unclosed and earn a non-retryable HTTP 400 on a decision that is
+ * already committed, so an oversized post falls back to unparsed plain text.
+ */
+export function buildCopyableDraft(body: string): CopyableDraft {
+  const wrapped = `<pre>${escapeHtml(body)}</pre>`;
+  return wrapped.length <= TELEGRAM_MAX_MESSAGE_LENGTH
+    ? { text: wrapped, parseMode: 'HTML' }
+    : { text: body, parseMode: null };
 }
 
 /** Deliberately vague about internals; the request id is the only handle for support. */
