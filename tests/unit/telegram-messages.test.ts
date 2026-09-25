@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildCopyableDraft,
   buildDraftMessage,
   buildRejectionMessage,
   buildNewsReviewBlock,
@@ -9,6 +10,7 @@ import {
   buildUnknownDraftMessage,
   reviewKeyboard,
 } from '@/lib/telegram/messages';
+import { TELEGRAM_MAX_MESSAGE_LENGTH } from '@/lib/telegram/format';
 import type { NewsItem } from '@/lib/news/types';
 
 const NEWS: NewsItem = {
@@ -157,6 +159,23 @@ describe('other messages', () => {
     expect(fresh).not.toMatch(/already/i);
   });
 
+  it('points an approval at the copyable post that follows it', () => {
+    for (const changed of [true, false]) {
+      const text = buildReviewConfirmation({ shortId: 'AB12CD', status: 'approved', changed });
+      expect(text).toMatch(/next message/i);
+      expect(text).toMatch(/copy/i);
+      expect(text).toMatch(/does not post anything/i);
+    }
+  });
+
+  it('does not promise a post when the draft was rejected', () => {
+    for (const changed of [true, false]) {
+      const text = buildReviewConfirmation({ shortId: 'AB12CD', status: 'rejected', changed });
+      expect(text).not.toMatch(/next message/i);
+      expect(text).toMatch(/rejected/i);
+    }
+  });
+
   it('never claims anything was published to LinkedIn', () => {
     const all = [
       buildDraftMessage({
@@ -176,5 +195,51 @@ describe('other messages', () => {
     const text = buildUnknownDraftMessage('ZZZZZZ');
     expect(text).toContain('ZZZZZZ');
     expect(text).toMatch(/not found|no draft/i);
+  });
+});
+
+describe('buildCopyableDraft', () => {
+  it('sends the post as an HTML code block so Telegram offers a copy control', () => {
+    const message = buildCopyableDraft(BODY);
+    expect(message.parseMode).toBe('HTML');
+    expect(message.text).toBe(`<pre>${BODY}</pre>`);
+  });
+
+  it('carries nothing but the post: no id, score, news block, or instructions', () => {
+    const message = buildCopyableDraft(BODY);
+    expect(message.text).not.toMatch(/DRAFT |SCORE:|WHY:|NEWS SOURCE:|APPROVE|REJECT/);
+  });
+
+  it('preserves the paragraph breaks a LinkedIn post depends on', () => {
+    const body = 'First paragraph.\n\nSecond paragraph.';
+    expect(buildCopyableDraft(body).text).toBe(`<pre>${body}</pre>`);
+  });
+
+  it('escapes HTML inside the block so a model cannot inject markup', () => {
+    const message = buildCopyableDraft('A <b>bold</b> claim & a caveat');
+    expect(message.text).toBe('<pre>A &lt;b&gt;bold&lt;/b&gt; claim &amp; a caveat</pre>');
+  });
+
+  it('falls back to plain text when the block would exceed one Telegram message', () => {
+    // A <pre> split across chunks leaves an unclosed tag and Telegram rejects the
+    // whole message with a 400, which would dead-letter an approval already recorded.
+    const body = 'a'.repeat(TELEGRAM_MAX_MESSAGE_LENGTH);
+    const message = buildCopyableDraft(body);
+    expect(message.parseMode).toBeNull();
+    expect(message.text).toBe(body);
+    expect(message.text).not.toContain('<pre>');
+  });
+
+  it('keeps the code block right up to the limit', () => {
+    const body = 'a'.repeat(TELEGRAM_MAX_MESSAGE_LENGTH - '<pre></pre>'.length);
+    expect(buildCopyableDraft(body).parseMode).toBe('HTML');
+  });
+
+  it('accounts for escaping when measuring against the limit', () => {
+    // Each '&' becomes '&amp;', so the raw length is a poor proxy for the sent length.
+    const body = '&'.repeat(TELEGRAM_MAX_MESSAGE_LENGTH / 2);
+    const message = buildCopyableDraft(body);
+    expect(message.parseMode).toBeNull();
+    expect(message.text).toBe(body);
   });
 });

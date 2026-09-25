@@ -57,7 +57,8 @@ describe('approval', () => {
 
     expect(harness.repo.drafts.get(draft.id)!.status).toBe('approved');
     expect(harness.telegram.answered.at(-1)).toMatchObject({ text: 'Approved' });
-    expect(harness.lastMessage()!.text).toMatch(/approved/i);
+    // The copyable post is the last message; the confirmation sits just before it.
+    expect(harness.telegram.sent.at(-2)!.text).toMatch(/approved/i);
   });
 
   it('moves a pending draft to approved via the text command', async () => {
@@ -100,6 +101,32 @@ describe('approval', () => {
     });
   });
 
+  it('returns the post on its own, ready to copy, after the confirmation', async () => {
+    const { harness, draft } = await harnessWithPendingDraft();
+    const before = harness.telegram.sent.length;
+    await harness.post(callback(draft.short_id, 'a', draft.telegram_message_id!));
+
+    const after = harness.telegram.sent.slice(before);
+    expect(after).toHaveLength(2);
+    expect(after[0]!.text).toMatch(/approved/i);
+    expect(after[1]).toMatchObject({ parseMode: 'HTML', text: `<pre>${DRAFT.draft}</pre>` });
+  });
+
+  it('puts nothing but the post in the copyable message', async () => {
+    const { harness, draft } = await harnessWithPendingDraft();
+    await harness.post(callback(draft.short_id, 'a', draft.telegram_message_id!));
+
+    const copyable = harness.lastMessage()!.text;
+    expect(copyable).not.toContain(draft.short_id);
+    expect(copyable).not.toMatch(/SCORE:|WHY:|APPROVE|REJECT|NEWS SOURCE:/);
+  });
+
+  it('returns the post after the text command too', async () => {
+    const { harness, draft } = await harnessWithPendingDraft();
+    await harness.post(command(`APPROVE ${draft.short_id}`));
+    expect(harness.lastMessage()!.text).toBe(`<pre>${DRAFT.draft}</pre>`);
+  });
+
   it('never publishes anywhere: the only outputs are database rows and Telegram messages', async () => {
     const { harness, draft } = await harnessWithPendingDraft();
     await harness.post(callback(draft.short_id, 'a', draft.telegram_message_id!));
@@ -119,6 +146,17 @@ describe('rejection', () => {
     expect(harness.repo.notes.size).toBe(1);
   });
 
+  it('does not hand back a copyable post for a rejected draft', async () => {
+    const { harness, draft } = await harnessWithPendingDraft();
+    const before = harness.telegram.sent.length;
+    await harness.post(callback(draft.short_id, 'r', draft.telegram_message_id!));
+
+    const after = harness.telegram.sent.slice(before);
+    expect(after).toHaveLength(1);
+    expect(after[0]!.text).toMatch(/rejected/i);
+    expect(after[0]!.text).not.toContain(DRAFT.draft);
+  });
+
   it('rejects via the text command too', async () => {
     const { harness, draft } = await harnessWithPendingDraft();
     await harness.post(command(`REJECT ${draft.short_id}`));
@@ -135,8 +173,11 @@ describe('idempotency', () => {
     expect(harness.repo.drafts.get(draft.id)!.status).toBe('approved');
     expect(harness.repo.reviews.filter((r) => r.applied)).toHaveLength(1);
     expect(harness.repo.reviews).toHaveLength(2);
-    expect(harness.lastMessage()!.text).toMatch(/already approved/i);
     expect(harness.telegram.answered.at(-1)).toMatchObject({ text: 'Already approved' });
+    // A repeat press changes nothing, but it should still hand back the post:
+    // it is the only way to recover the text once the message scrolls away.
+    expect(harness.lastMessage()!.text).toBe(`<pre>${DRAFT.draft}</pre>`);
+    expect(harness.telegram.sent.at(-2)!.text).toMatch(/already approved/i);
   });
 
   it('a redelivery of the exact same update is dropped by the dedup ledger', async () => {
@@ -155,7 +196,7 @@ describe('idempotency', () => {
     await harness.post(callback(draft.short_id, 'r', draft.telegram_message_id!));
 
     expect(harness.repo.drafts.get(draft.id)!.status).toBe('approved');
-    expect(harness.lastMessage()!.text).toMatch(/already approved/i);
+    expect(harness.telegram.sent.some((m) => /already approved/i.test(m.text))).toBe(true);
   });
 
   it('an approve command after a reject does not flip the decision', async () => {
@@ -235,6 +276,7 @@ describe('a failing callback acknowledgement must not undo a recorded decision',
 
     const sent = harness.telegram.sent.map((m) => m.text).join('\n');
     expect(sent).toMatch(/approved/i);
+    expect(sent).toContain(DRAFT.draft);
     expect(sent).not.toMatch(/something went wrong/i);
   });
 

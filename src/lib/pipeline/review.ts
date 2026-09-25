@@ -1,6 +1,7 @@
 import { describeError } from '../errors';
 import type { ParsedReviewCallback, ParsedReviewCommand } from '../telegram/parse';
 import {
+  buildCopyableDraft,
   buildFailureMessage,
   buildReviewConfirmation,
   buildUnknownDraftMessage,
@@ -114,6 +115,19 @@ export async function handleReview(
       chatId: review.chatId,
       text: buildReviewConfirmation({ shortId: draft.short_id, status: draft.status, changed }),
     });
+
+    // Hand back the approved post with nothing attached, so it can be copied
+    // straight into LinkedIn. Sent on a repeat press too: once the original
+    // draft message has scrolled away, this is the only way to recover the text.
+    if (draft.status === 'approved') {
+      const copyable = buildCopyableDraft(draft.body);
+      await telegram.sendMessage({
+        chatId: review.chatId,
+        text: copyable.text,
+        parseMode: copyable.parseMode,
+      });
+    }
+
     await repo.setUpdateStatus(review.updateId, 'done');
 
     if (!changed) {
