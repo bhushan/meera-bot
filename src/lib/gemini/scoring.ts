@@ -53,7 +53,7 @@ Guidance on the range:
 - 8-10: a specific, evidenced, non-obvious point that only this founder could make.
 
 Return JSON only. "reason" is one concise sentence addressed to the founder explaining the score.
-"keywords" holds three to five short search terms drawn from the note, suitable for a news search; return an empty array when the note does not merit a post.`;
+"keywords" holds three to five search terms drawn from the note. Each must be one to three words, the kind of short phrase someone would actually type into a news search ("contract manufacturing", "certificate of analysis", "skin barrier"), never a long descriptive phrase ("contract manufacturing quality control"), because a long phrase matches no articles. Return an empty array when the note does not merit a post.`;
 
 const buildPrompt = (input: ScoreNoteInput): string => {
   const history = (input.priorDecisions ?? []).filter((d) => d.excerpt.trim().length > 0);
