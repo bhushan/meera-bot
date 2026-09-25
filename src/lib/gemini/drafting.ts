@@ -120,7 +120,9 @@ export async function draftPost(
     schema: draftModelOutputSchema,
     responseSchema: RESPONSE_SCHEMA as unknown as Record<string, unknown>,
     temperature: 0.6,
-    maxOutputTokens: 2048,
+    // Budgets reasoning tokens as well as the visible output, so this is far
+    // larger than the response needs on its own.
+    maxOutputTokens: 4096,
   });
 
   // The model may only claim to have used news we actually retrieved, and only at

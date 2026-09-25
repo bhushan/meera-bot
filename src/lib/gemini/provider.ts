@@ -34,18 +34,35 @@ export function createGoogleGenAiGenerateText(apiKey: string): GenerateTextFn {
       },
     });
 
+    const finishReason = response.candidates?.[0]?.finishReason;
+
+    // `maxOutputTokens` is a budget for reasoning tokens and visible output
+    // together, not for the visible output alone. A budget sized for the JSON
+    // gets spent on reasoning and the object is cut off part-written, which
+    // reaches the caller as unparseable text. Name the real cause here.
+    if (finishReason === 'MAX_TOKENS') {
+      throw new AppError({
+        kind: 'gemini',
+        message: 'Gemini stopped at the output token limit before finishing its response',
+        retryable: true,
+        context: {
+          finishReason,
+          maxOutputTokens,
+          thoughtsTokenCount: response.usageMetadata?.thoughtsTokenCount,
+          candidatesTokenCount: response.usageMetadata?.candidatesTokenCount,
+        },
+      });
+    }
+
     const text = response.text;
     if (typeof text !== 'string' || text.trim().length === 0) {
-      // Usually a safety block or a truncated generation. Surface the finish
-      // reason (never the prompt) so the cause is visible in logs.
+      // Usually a safety block. Surface the finish reason (never the prompt)
+      // so the cause is visible in logs.
       throw new AppError({
         kind: 'gemini',
         message: 'Gemini returned an empty response',
         retryable: true,
-        context: {
-          finishReason: response.candidates?.[0]?.finishReason,
-          promptFeedback: response.promptFeedback?.blockReason,
-        },
+        context: { finishReason, promptFeedback: response.promptFeedback?.blockReason },
       });
     }
     return text;

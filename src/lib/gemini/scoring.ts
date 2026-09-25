@@ -89,7 +89,9 @@ export async function scoreNote(gemini: GeminiClient, input: ScoreNoteInput): Pr
     schema: noteScoreSchema,
     responseSchema: RESPONSE_SCHEMA as unknown as Record<string, unknown>,
     temperature: 0.1,
-    maxOutputTokens: 512,
+    // Budgets reasoning tokens as well as the visible output, so this is far
+    // larger than the response needs on its own.
+    maxOutputTokens: 2048,
   });
 
   return { ...result, keywords: normaliseKeywords(result.keywords) };
