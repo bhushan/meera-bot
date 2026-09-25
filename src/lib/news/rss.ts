@@ -127,12 +127,20 @@ export function parseRssFeed(xml: string, options: ParseRssOptions): NewsItem[] 
   const cutoff = now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000;
 
   const items: NewsItem[] = [];
+  // Google News routinely repeats one press release across several outlets, and
+  // sometimes the identical entry more than once. Left alone, a single story can
+  // occupy every candidate slot and crowd out anything the relevance check could
+  // actually use.
+  const seenUrls = new Set<string>();
+  const seenHeadlines = new Set<string>();
+
   for (const raw of rawItems) {
     if (items.length >= maxResults) break;
     if (!raw || typeof raw !== 'object') continue;
 
     const url = textOf(raw.link);
     if (!/^https?:\/\//i.test(url)) continue;
+    if (seenUrls.has(url)) continue;
 
     const published = new Date(textOf(raw.pubDate));
     const publishedMs = published.getTime();
@@ -155,6 +163,14 @@ export function parseRssFeed(xml: string, options: ParseRssOptions): NewsItem[] 
       headline = headline.slice(0, -(publication.length + 3)).trim();
     }
     if (headline.length === 0) continue;
+
+    const headlineKey = headline
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    if (seenHeadlines.has(headlineKey)) continue;
+    seenUrls.add(url);
+    seenHeadlines.add(headlineKey);
 
     items.push({
       headline: headline.slice(0, 300),

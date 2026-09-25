@@ -283,3 +283,50 @@ describe('newsQueryFromKeywords: phrase length', () => {
     expect(newsQueryFromKeywords(['skin barrier', 'ph'])).toBe('"skin barrier" OR ph');
   });
 });
+
+describe('parseRssFeed: duplicate suppression', () => {
+  const dup = (n: number, title: string, link: string) =>
+    item({
+      title: `${title} - Pub`,
+      link,
+      pubDate: 'Mon, 22 Sep 2026 09:00:00 GMT',
+      source: 'Pub',
+    });
+
+  it('keeps only the first of several items sharing a URL', () => {
+    const xml = feed(
+      dup(1, 'Repeated story', 'https://news.google.com/rss/articles/same') +
+        dup(2, 'Repeated story', 'https://news.google.com/rss/articles/same') +
+        dup(3, 'Another story', 'https://news.google.com/rss/articles/other'),
+    );
+    const items = parseRssFeed(xml, { now: NOW });
+    expect(items).toHaveLength(2);
+    expect(items.map((i) => i.url)).toEqual([
+      'https://news.google.com/rss/articles/same',
+      'https://news.google.com/rss/articles/other',
+    ]);
+  });
+
+  it('suppresses the same headline syndicated under different URLs', () => {
+    // Google News routinely returns one press release under several outlets;
+    // without this they crowd out every other candidate.
+    const xml = feed(
+      dup(1, 'Batch Testing Announced', 'https://news.google.com/rss/articles/a') +
+        dup(2, 'batch testing announced', 'https://news.google.com/rss/articles/b') +
+        dup(3, 'Distinct headline', 'https://news.google.com/rss/articles/c'),
+    );
+    const items = parseRssFeed(xml, { now: NOW });
+    expect(items).toHaveLength(2);
+    expect(items[1]!.headline).toBe('Distinct headline');
+  });
+
+  it('counts the cap in distinct items, not raw feed entries', () => {
+    const many =
+      dup(1, 'Same', 'https://news.google.com/rss/articles/x').repeat(5) +
+      dup(2, 'One', 'https://news.google.com/rss/articles/1') +
+      dup(3, 'Two', 'https://news.google.com/rss/articles/2');
+    const items = parseRssFeed(feed(many), { now: NOW, maxResults: 3 });
+    expect(items).toHaveLength(3);
+    expect(new Set(items.map((i) => i.url)).size).toBe(3);
+  });
+});
