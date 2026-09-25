@@ -15,6 +15,18 @@ Telegram note  ->  score 0-10  ->  (optional news angle)  ->  draft in her voice
                                                             Meera copies it into LinkedIn
 ```
 
+## Live deployment
+
+| | |
+| --- | --- |
+| App | https://meera-bot-pink.vercel.app |
+| Health | https://meera-bot-pink.vercel.app/api/health |
+| Bot | [@meera546352627374_bot](https://t.me/meera546352627374_bot) |
+| Model | `gemini-3.8-flash` |
+| Database | Supabase `lemtkszbtwbgxekcrlfv`, `us-east-1` |
+
+The Supabase region is matched to the Vercel function region (`iad1`) on purpose: the pipeline makes several database round trips per note, so a cross-continent pairing would add seconds of latency to every draft.
+
 See [`docs/component-map.md`](docs/component-map.md) for the full flow and data model, and [`SECURITY.md`](SECURITY.md) for the security posture.
 
 ## Stack
@@ -51,7 +63,7 @@ Fill in `.env.local`:
 | `GEMINI_MODEL` | `gemini-3.8-flash` is the current default. Google retires model ids over time and a retired id returns a non-retryable 404, so check `models.list` if drafting stops working |
 | `SUPABASE_URL` | Supabase project settings, API, Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project settings, API, `service_role` key. Server-side only |
-| `APP_BASE_URL` | Your production origin, for example `https://meera-bot.vercel.app` |
+| `APP_BASE_URL` | Your production origin, with no trailing slash, for example `https://meera-bot-pink.vercel.app` |
 
 Then:
 
