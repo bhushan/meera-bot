@@ -3,7 +3,7 @@ import { ConfigValidationError } from './errors';
 
 export { ConfigValidationError };
 
-export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+export const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
 
 /** Treat empty strings (a very common shape in CI/Vercel) as "not set". */
 const blankToUndefined = (value: unknown) =>

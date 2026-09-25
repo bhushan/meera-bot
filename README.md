@@ -48,7 +48,7 @@ Fill in `.env.local`:
 | `TELEGRAM_WEBHOOK_SECRET` | Generate one: `openssl rand -hex 24`. Telegram only accepts `A-Z a-z 0-9 _ -`, 1 to 256 characters |
 | `TELEGRAM_ALLOWED_CHAT_ID` | See "Telegram bot and private channel setup" below. Channels are negative, for example `-1001234567890` |
 | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/apikey) |
-| `GEMINI_MODEL` | `gemini-2.5-flash` is a good default. Any current Gemini model id works |
+| `GEMINI_MODEL` | `gemini-3.8-flash` is the current default. Google retires model ids over time and a retired id returns a non-retryable 404, so check `models.list` if drafting stops working |
 | `SUPABASE_URL` | Supabase project settings, API, Project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project settings, API, `service_role` key. Server-side only |
 | `APP_BASE_URL` | Your production origin, for example `https://meera-bot.vercel.app` |
